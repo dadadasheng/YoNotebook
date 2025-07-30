@@ -46,9 +46,9 @@ const getPassword = () => {
         </div>
         <div v-show="showed_container_name === 'password_container'" class="password_container">
             <input  ref="ref_password_input" type="password" placeholder="Enter your password" v-model="password" @keyup.enter="getPassword" />
-            <p class="tips_container">
+            <div class="tips_container">
                 <p v-if="password">enter</p>
-            </p>
+            </div>
         </div>
     </div>
 </template>  
@@ -93,6 +93,7 @@ const getPassword = () => {
         }
     }
     .bookname_container,.password_container{
+        height: 60px;
         .tips_container{
             height: 30px;
             text-align: center;
@@ -116,6 +117,7 @@ const getPassword = () => {
             padding: 10px;
             border: solid 1px white;
             border-radius: 5px;
+            margin-bottom: 10px;
             background-color: black;
             color: white;
         }

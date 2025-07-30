@@ -7,11 +7,11 @@
 </template>
 <style scoped>
 .app-container {
-    height: 100vh;
-    width: 100vw;
+    height: 100%;
+    width: 100%;
     display: flex;
     justify-content: center;
     align-items: center;
-    background-color: #f0f0f0;
+    box-sizing: content-box;
 }
 </style>
