@@ -2,12 +2,13 @@
 import { onMounted, ref } from 'vue';
 import  { axios } from '@/api/index';
 const axiosInstance = axios;
-
+const currentDate = new Date();
 const isCalenderDays = ref(true);
 const isCalenderMonths = ref(false);
 const isTodo = ref(false);
 const isDone = ref(false);
 const isDel = ref(false);
+
 const showCalenderDays = () => {
     isCalenderDays.value = true;
     isCalenderMonths.value = false;
@@ -49,6 +50,12 @@ const todoText = ref('');
 const addTodoItem = () => {
     if (todoText.value.trim()) {
         todoItems.value.push({ text: todoText.value, done: false });
+        axiosInstance.post('/todoItem/add',null,{
+            params:{
+                todo_text: todoText.value,
+                status: 0,
+            }
+        })
         todoText.value = '';
     }
 };
@@ -97,13 +104,31 @@ const getDaylist = (year: number, month: number) => {
 const showSelectedDayTodo = (day_num: number)=>{
     if(day_num.toString() === '') return;
     selectedDay.value = day_num
+        axiosInstance.get('/todoItem/create_time',{
+        params: {
+            year: selectedYear.value.toString(),
+            month: selectedMonth.value.toString().padStart(2, '0'), 
+            day: selectedDay.value.toString()
+        }
+    })
+    .then(response => {
+        allItems.value = response.data;
+        console.log(response.data);
+        // getSelectedDayTodoData()
+    })
+    .catch(error => {
+        console.error('Error fetching data:', error);
+    });
 }
 const selectedDayTodoData = ref({
     todoItems: [],
     doneItems: [],
     delItems: []
 });
-
+const allItems = ref([]);
+// const getSelectedDayTodoData = () => {
+//     const targetDate = `${selectedYear.value}-${selectedMonth.value.toString().padStart(2, '0')}-${selectedDay.value.toString().padStart(2, '0')}`;
+//     console.log(allItems.value.filter(item => item.create_time.startsWith(targetDate)));}
 onMounted(() => {
     const currentDate = new Date();
     selectedYear.value = currentDate.getFullYear();
@@ -112,12 +137,15 @@ onMounted(() => {
     getDaylist(selectedYear.value, selectedMonth.value);
     axiosInstance.get('/todoItem/all')
     .then(response => {
+        allItems.value = response.data;
         console.log(response.data);
+        // getSelectedDayTodoData()
     })
     .catch(error => {
         console.error('Error fetching data:', error);
+    });
 });
-});
+
 // time text status
 </script>
 <template>
