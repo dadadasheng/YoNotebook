@@ -33,46 +33,85 @@ const showDel = () => {
     isDel.value = !isDel.value;
 };
 
-const todoItems = ref([
-    { text: 'Todo Item 1', done: false },
-    { text: 'Todo Item 2', done: false },
-    { text: 'Todo Item 3', done: false }
-]);
-const doneItems = ref([
-    { text: 'Done Item 1', done: true },
-    { text: 'Done Item 2', done: true }
-]);
-const delItems = ref([
-    { text: 'Deleted Item 1', done: false },
-    { text: 'Deleted Item 2', done: false }
-]);
+const todoItems = ref<{ text: string; status: number; id: number }[]>([]);
+const doneItems = ref<{ text: string; status: number; id: number }[]>([]);
+const delItems = ref<{ text: string; status: number; id: number }[]>([]);
 const todoText = ref('');
 const addTodoItem = () => {
     if (todoText.value.trim()) {
-        todoItems.value.push({ text: todoText.value, done: false });
         axiosInstance.post('/todoItem/add',null,{
             params:{
                 todo_text: todoText.value,
                 status: 0,
+                year: selectedYear.value,
+                month: selectedMonth.value,
+                day: selectedDay.value
             }
-        })
+        }).then(response => {
+            let data = JSON.parse(response.data);
+            console.log('Todo item added:', response.data);
+            todoItems.value.push({ text: data.todoText, status: data.status, id: data.id });
+        }).catch(error => {
+            console.error('Error adding todo item:', error);
+        });
+        
         todoText.value = '';
     }
 };
 const delTodoItem = (index: number) => {
-    delItems.value.push({ text: todoItems.value[index].text, done: false });
+    delItems.value.push({ text: todoItems.value[index].text, status: 2, id: todoItems.value[index].id });
+    axiosInstance.post('/todoItem/updateToDoItemStatus', null, {
+        params: {
+            Id: todoItems.value[index].id,
+            status: 2
+        }
+    }).then(response => {
+        console.log('Todo item deleted:', response.data);
+    }).catch(error => {
+        console.error('Error deleting todo item:', error);
+    });
     todoItems.value.splice(index, 1);
 };
 const doneTodoItem = (index: number) => {
-    doneItems.value.push({ text: todoItems.value[index].text, done: true });
+    doneItems.value.push({ text: todoItems.value[index].text, status: 1, id: todoItems.value[index].id });
+    axiosInstance.post('/todoItem/updateToDoItemStatus', null, {
+        params: {
+            Id: todoItems.value[index].id,
+            status: 1
+        }
+    }).then(response => {
+        console.log('Todo item deleted:', response.data);
+    }).catch(error => {
+        console.error('Error deleting todo item:', error);
+    });
     todoItems.value.splice(index, 1);
 };
 const delDoneItem = (index: number) => {
-    todoItems.value.push({ text: doneItems.value[index].text, done: false });
+    axiosInstance.post('/todoItem/updateToDoItemStatus', null, {
+        params: {
+            Id: doneItems.value[index].id,
+            status: 0
+        }
+    }).then(response => {
+        console.log('Todo item deleted:', response.data);
+    }).catch(error => {
+        console.error('Error deleting todo item:', error);
+    });
+    todoItems.value.push({ text: doneItems.value[index].text, status: 0, id: doneItems.value[index].id });
     doneItems.value.splice(index, 1);
 };
 const delDelItem = (index: number) => {
-    todoItems.value.push({ text: delItems.value[index].text, done: false });
+        axiosInstance.post('/todoItem/updateToDoItemStatus', null, {
+        params: {
+            Id: delItems.value[index].id,
+            status: 0
+        }
+    }).then(response => {
+        console.log('Todo item deleted:', response.data);
+    }).catch(error => {
+        console.error('Error deleting todo item:', error);
+    });
+    todoItems.value.push({ text: delItems.value[index].text, status: 0, id: delItems.value[index].id });
     delItems.value.splice(index, 1);
 };
 const selectedYear = ref(2025);
@@ -103,49 +142,176 @@ const getDaylist = (year: number, month: number) => {
 };
 const showSelectedDayTodo = (day_num: number)=>{
     if(day_num.toString() === '') return;
+    isPassDay(selectedYear.value, selectedMonth.value, day_num) ? passday.value = true : passday.value = false;
+    isToday(selectedYear.value, selectedMonth.value, day_num) ? today.value = true : today.value = false;
+    console.log('is_passday', passday.value);
     selectedDay.value = day_num
-        axiosInstance.get('/todoItem/create_time',{
+    axiosInstance.get('/todoItem/create_time',{
         params: {
-            year: selectedYear.value.toString(),
-            month: selectedMonth.value.toString().padStart(2, '0'), 
-            day: selectedDay.value.toString()
+            year: selectedYear.value,
+            month: selectedMonth.value, 
+            day: selectedDay.value
         }
     })
     .then(response => {
-        allItems.value = response.data;
-        console.log(response.data);
-        // getSelectedDayTodoData()
+        // Handle the response data
+        const data = JSON.parse(response.data);
+        if (Array.isArray(data)) {
+                selectedDayTodoData.value.todoItems = data.filter((item: { todoText: any; status: any; id: number  }) => item.status === 0)
+                .map((item: { todoText: any; status: any; id: number }) => ({
+                    text: item.todoText,
+                    status: item.status,
+                    id: item.id
+                }));
+                selectedDayTodoData.value.doneItems = data.filter((item: { todoText: any; status: any; id: number  }) => item.status === 1)
+                .map((item: { todoText: any; status: any; id: number  }) => ({
+                    text: item.todoText,
+                    status: item.status,
+                    id: item.id
+                }));
+                selectedDayTodoData.value.delItems = data.filter((item: { status: number; }) => item.status === 2)
+                .map((item: { todoText: any; status: any; id: number  }) => ({
+                    text: item.todoText,
+                    status: item.status,
+                    id: item.id
+                }));
+        } else {
+            selectedDayTodoData.value.todoItems = [];
+        }
+        todoItems.value = selectedDayTodoData.value.todoItems;
+        doneItems.value = selectedDayTodoData.value.doneItems;
+        delItems.value = selectedDayTodoData.value.delItems;
     })
     .catch(error => {
         console.error('Error fetching data:', error);
     });
 }
-const selectedDayTodoData = ref({
+interface TodoItem {
+    text: string;
+    status: number;
+    id: number;
+}
+
+const selectedDayTodoData = ref<{
+    todoItems: TodoItem[];
+    doneItems: TodoItem[];
+    delItems: TodoItem[];
+}>({
     todoItems: [],
     doneItems: [],
     delItems: []
 });
 const allItems = ref([]);
-// const getSelectedDayTodoData = () => {
-//     const targetDate = `${selectedYear.value}-${selectedMonth.value.toString().padStart(2, '0')}-${selectedDay.value.toString().padStart(2, '0')}`;
-//     console.log(allItems.value.filter(item => item.create_time.startsWith(targetDate)));}
+const selectedDayTodo = ref([]);
 onMounted(() => {
     const currentDate = new Date();
     selectedYear.value = currentDate.getFullYear();
     selectedMonth.value = currentDate.getMonth() + 1; // Months are 0-indexed in JavaScript
     selectedDay.value = currentDate.getDate();
     getDaylist(selectedYear.value, selectedMonth.value);
-    axiosInstance.get('/todoItem/all')
+    axiosInstance.get('/todoItem/create_time',{
+        params: {
+            year: selectedYear.value,
+            month: selectedMonth.value, 
+            day: selectedDay.value
+        }
+    })
     .then(response => {
-        allItems.value = response.data;
-        console.log(response.data);
-        // getSelectedDayTodoData()
+        // Handle the response data
+        const data = JSON.parse(response.data);
+        if (Array.isArray(data)) {
+                selectedDayTodoData.value.todoItems = data.filter((item: { todoText: any; status: any; id: number  }) => item.status === 0)
+                .map((item: { todoText: any; status: any; id: number }) => ({
+                    text: item.todoText,
+                    status: item.status,
+                    id: item.id
+                }));
+                selectedDayTodoData.value.doneItems = data.filter((item: { todoText: any; status: any; id: number  }) => item.status === 1)
+                .map((item: { todoText: any; status: any; id: number  }) => ({
+                    text: item.todoText,
+                    status: item.status,
+                    id: item.id
+                }));
+                selectedDayTodoData.value.delItems = data.filter((item: { status: number; }) => item.status === 2)
+                .map((item: { todoText: any; status: any; id: number  }) => ({
+                    text: item.todoText,
+                    status: item.status,
+                    id: item.id
+                }));
+        } else {
+            selectedDayTodoData.value.todoItems = [];
+        }
+        todoItems.value = selectedDayTodoData.value.todoItems;
+        doneItems.value = selectedDayTodoData.value.doneItems;
+        delItems.value = selectedDayTodoData.value.delItems;
     })
     .catch(error => {
         console.error('Error fetching data:', error);
     });
 });
+const passday = ref(false);
+const today = ref(true);
+const isPassDay = (year: number, month: number, day: number) => {
+    const today = new Date();
+    const selectedDate = new Date(year, month - 1, day);
+    // 只判断是否为过去日期（今天和未来都为false）
+    // 比较年月日
+    if (
+        selectedDate.getFullYear() < today.getFullYear() ||
+        (selectedDate.getFullYear() === today.getFullYear() && selectedDate.getMonth() < today.getMonth()) ||
+        (selectedDate.getFullYear() === today.getFullYear() && selectedDate.getMonth() === today.getMonth() && selectedDate.getDate() < today.getDate())
+    ) {
+        return true;
+    }
+    return false;
+};
+const isToday = (year: number, month: number, day: number) => {
+    const today = new Date();
+    const selectedDate = new Date(year, month - 1, day);
+    // 只判断是否为今天
+    return (
+        selectedDate.getFullYear() === today.getFullYear() &&
+        selectedDate.getMonth() === today.getMonth() &&
+        selectedDate.getDate() === today.getDate()
+    );
+};
+const isEditing = ref(false);
+const editTodoItem = ref<TodoItem | null>(null);
+const editTodoItemIndex = ref(-1);
+const editTodoItemText = (item: TodoItem, todoItem_index: number) =>{
+    if(passday.value) return;
+    editTodoItem.value = item;
+    isEditing.value = true;
+    editTodoItemIndex.value = todoItem_index;
+    todoText.value = item.text; // Set the input value to the item's text
+}
 
+const cancelTodoItemEdit = () => {
+    isEditing.value = false;
+    editTodoItem.value = null;
+    editTodoItemIndex.value = -1;
+    todoText.value = ''; // Clear the input field
+};
+const updateTodoText = () => {
+    if (editTodoItem.value && editTodoItem.value.text.trim()) {
+        editTodoItem.value.text = todoText.value
+        todoItems.value[editTodoItemIndex.value].text = todoText.value;
+        axiosInstance.post('/todoItem/updateToDoItemContent', null, {
+            params: {
+                Id: editTodoItem.value.id,
+                todo_text: editTodoItem.value.text
+            }
+        }).then(response => {
+            console.log('Todo item updated:', response.data);
+            isEditing.value = false;
+            editTodoItem.value = null;
+            editTodoItemIndex.value = -1;
+            todoText.value = ''; // Clear the input field after updating
+        }).catch(error => {
+            console.error('Error updating todo item:', error);
+        });
+    }
+};
 // time text status
 </script>
 <template>
@@ -412,11 +578,12 @@ onMounted(() => {
                 </div>
                 <div v-if="isTodo" class="todo_container">
                     <div v-if="isTodo" v-show="todoItems.length !== 0" class="doing_items_container">
-                        <div v-for="(item, index) in todoItems" class="todo_item_container">
-                            <p>{{ item.text }}</p>
+                        <div v-for="(item, index) in todoItems" class="todo_item_container" >
+                            <p v-if="editTodoItemIndex !== index" @click="editTodoItemText(item,index)">{{ item.text }}</p>
+                            <p v-if="editTodoItemIndex === index" @click="cancelTodoItemEdit" class="EditingItem">{{ item.text }}</p>
                             <div class="none"></div>
-                            <button @click="delTodoItem(index)">Delete</button>
-                            <button @click="doneTodoItem(index)">Done</button>
+                            <button v-if="!passday" @click="delTodoItem(index)">Delete</button>
+                            <button v-if="!passday && !today" @click="doneTodoItem(index)">Done</button>
                         </div>
                     </div>
                     <div v-if="isDone && todoItems.length !== 0" class="none"></div>
@@ -424,7 +591,7 @@ onMounted(() => {
                         <div v-for="item,index in doneItems" class="todo_item_container done_item">
                             <p>{{ item.text }}</p>
                             <div class="none"></div>
-                            <button @click="delDoneItem(index)">revoke</button>
+                            <button v-if="!passday" @click="delDoneItem(index)">revoke</button>
                         </div>
                     </div>
                     <div v-if="isDel && doneItems.length !== 0" class="none"></div>
@@ -432,16 +599,22 @@ onMounted(() => {
                         <div v-for="item,index in delItems" class="todo_item_container del_item">
                             <p>{{ item.text }}</p>
                             <div class="none"></div>
-                            <button @click="delDelItem(index)">revoke</button>
+                            <button v-if="!passday" @click="delDelItem(index)">revoke</button>
                         </div>
                     </div>
                 </div>
-                <div v-if="isTodo" class="add_todo_items_container">
-                    <div class="add_item_input_container">
+                <div v-if="isTodo && !passday" class="add_todo_items_container">
+                    <div v-if="!isEditing" class="add_item_input_container">
                         <input type="text" placeholder="Add a new todo item" v-model="todoText" />
                     </div>
-                    <div class="add_item_button" @click="addTodoItem">
-                        <p>Add</p>
+                    <div v-if="isEditing" class="add_item_input_container">
+                        <input type="text" placeholder="Edit a new todo item" v-model="todoText" />
+                    </div>
+                    <div v-if="!isEditing" class="add_item_button" @click="addTodoItem">
+                        <p >Add</p>
+                    </div>
+                    <div v-if="isEditing" class="edit_item_button" @click="updateTodoText">
+                        <p>Edit</p>
                     </div>
                 </div>
             </div>
@@ -662,6 +835,9 @@ onMounted(() => {
                         .none{
                             flex: 1;
                         }
+                        .EditingItem{
+                            color: thistle;
+                        }
                     }
                     
                 }   
@@ -729,6 +905,17 @@ onMounted(() => {
                     }
                 }
                 .add_item_button{
+                    width: 100px;
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    border: solid 1px white;
+                    color: white;
+                    font-size: 24px;
+                    border-radius: 5px;
+                    cursor: pointer;
+                }
+                .edit_item_button{
                     width: 100px;
                     display: flex;
                     justify-content: center;
